@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Knowledge Dump Settings</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      max-width: 480px;
+      color: #222;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 0.35rem;
+      border: 1px solid #c3c3c3;
+      border-radius: 4px;
+      font-size: 0.95rem;
+    }
+    button {
+      margin-top: 1.5rem;
+      padding: 10px 14px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 4px;
+      background: #1d7bf2;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      min-height: 1.2rem;
+    }
+    small {
+      display: block;
+      color: #666;
+      margin-top: 0.3rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Knowledge Dump Configuration</h1>
+  <form id="options-form">
+    <label for="webhook-url">
+      Webhook URL
+      <input type="url" id="webhook-url" name="webhookUrl" placeholder="https://example.com/webhook" required>
+      <small>Must accept JSON POST requests.</small>
+    </label>
+
+    <label for="token">
+      Token
+      <input type="text" id="token" name="token" placeholder="Paste secure token" autocomplete="off" required>
+      <small>Stored securely via chrome.storage.sync.</small>
+    </label>
+
+    <button type="submit" id="save-btn">Save</button>
+    <div id="status" role="status" aria-live="polite"></div>
+  </form>
+
+  <script src="options.js"></script>
+</body>
+</html>
