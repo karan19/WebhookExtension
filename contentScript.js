@@ -10,6 +10,7 @@
   };
   let isActive = false;
   let currentSelection = '';
+  let currentPageUrl = '';
   let overlayHost;
   let overlayElements = null;
   let isSending = false;
@@ -271,15 +272,6 @@
           border-color: transparent;
           background: rgba(15, 23, 42, 0.85);
         }
-        .field input[readonly] {
-          cursor: default;
-          color: rgba(248, 250, 252, 0.8);
-        }
-        .field input[readonly]:focus {
-          outline: none;
-          border: 1px solid rgba(148, 163, 184, 0.4);
-          background: rgba(15, 23, 42, 0.45);
-        }
         .field label {
           position: absolute;
           left: 16px;
@@ -365,9 +357,9 @@
             <input type="text" id="title-input" autocomplete="off" placeholder=" ">
             <label for="title-input">Title *</label>
           </div>
-          <div class="field" id="url-field">
-            <input type="url" id="url-input" autocomplete="off" placeholder=" " readonly>
-            <label for="url-input">URL</label>
+          <div class="field" id="author-field">
+            <input type="text" id="author-input" autocomplete="off" placeholder=" ">
+            <label for="author-input">Author</label>
           </div>
           <div class="feedback" id="feedback"></div>
           <div class="actions">
@@ -386,9 +378,8 @@
         tagField: shadow.getElementById('tag-field'),
         titleInput: shadow.getElementById('title-input'),
         titleField: shadow.getElementById('title-field'),
-        urlInput: shadow.getElementById('url-input'),
-        urlField: shadow.getElementById('url-field'),
-        urlLabel: shadow.querySelector('label[for="url-input"]'),
+        authorInput: shadow.getElementById('author-input'),
+        authorField: shadow.getElementById('author-field'),
         contentLabel: shadow.querySelector('label[for="content-input"]'),
         modeButtons: Array.from(shadow.querySelectorAll('.mode-btn')),
         feedback: shadow.getElementById('feedback'),
@@ -445,7 +436,8 @@
     overlayElements.contentInput.value = currentSelection || '';
     overlayElements.tagInput.value = '';
     overlayElements.titleInput.value = document.title || '';
-    overlayElements.urlInput.value = window.location.href || '';
+    overlayElements.authorInput.value = '';
+    currentPageUrl = window.location.href || '';
     overlayElements.sendButton.disabled = false;
     overlayElements.sendButton.textContent = 'Send';
     isSending = false;
@@ -485,6 +477,7 @@
     overlayHost.style.display = 'none';
     overlayHost.setAttribute('aria-hidden', 'true');
     currentSelection = '';
+    currentPageUrl = '';
     isSending = false;
   }
 
@@ -508,29 +501,20 @@
     if (overlayElements.contentField) {
       overlayElements.contentField.classList.toggle('hidden', isPageMode);
     }
-    if (overlayElements.urlLabel) {
-      overlayElements.urlLabel.textContent = isPageMode ? 'URL *' : 'URL';
-    }
-    if (overlayElements.urlInput) {
-      overlayElements.urlInput.required = isPageMode;
-    }
-
-    const orders = {
-      snippet: {
-        contentField: 1,
-        tagField: 2,
-        titleField: 3,
-        urlField: 4
-      },
-      page: {
-        urlField: 1,
-        titleField: 2,
-        tagField: 3,
-        contentField: 4
-      }
+    const snippetOrder = {
+      contentField: 1,
+      tagField: 2,
+      titleField: 3,
+      authorField: 4
+    };
+    const pageOrder = {
+      titleField: 1,
+      tagField: 2,
+      authorField: 3,
+      contentField: 4
     };
 
-    const orderMap = orders[mode];
+    const orderMap = mode === 'snippet' ? snippetOrder : pageOrder;
     Object.entries(orderMap).forEach(([key, order]) => {
       const element = overlayElements[key];
       if (element) {
@@ -548,7 +532,7 @@
     const contentValue = overlayElements.contentInput.value.trim();
     const tag = overlayElements.tagInput.value.trim();
     const title = overlayElements.titleInput.value.trim();
-    const urlValue = overlayElements.urlInput.value.trim();
+    const author = overlayElements.authorInput.value.trim();
     const isSnippetMode = currentMode === 'snippet';
 
     if (isSnippetMode && !contentValue) {
@@ -566,7 +550,7 @@
       return;
     }
 
-    const urlToSend = urlValue || window.location.href || '';
+    const urlToSend = currentPageUrl || window.location.href || '';
     if (!isSnippetMode && !urlToSend) {
       setFeedback('URL is required when saving pages.', true);
       return;
@@ -623,12 +607,18 @@
       if (urlToSend) {
         payload.url = urlToSend;
       }
+      if (author) {
+        payload.author = author;
+      }
     } else {
       payload = {
         title,
         tag,
         url: urlToSend
       };
+      if (author) {
+        payload.author = author;
+      }
     }
     try {
       const response = await sendMessage({
