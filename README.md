@@ -42,6 +42,50 @@ If a webhook, token, or required fields for the chosen mode are missing, the ove
 
 Configure the page webhook/token in the Options page to enable this mode.
 
+### API examples
+
+Use these cURL snippets to test your endpoints (replace `X-Webhook-Token` with your token).
+
+#### Page endpoint
+
+```bash
+curl -X POST \
+  https://7aom0b2xpd.execute-api.us-west-2.amazonaws.com/prod/pages \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Token: <WEBHOOK_TOKEN>" \
+  -d '{
+    "author": "Karan",
+    "mood": "Curious",
+    "url": "https://example.com/full-article",
+    "title": "AI trends to watch",
+    "tag": "research",
+    "notes": "Save for team reading list",
+    "customField": "any extra key/value will be stored"
+  }'
+```
+
+#### Snippet endpoint
+
+```bash
+curl -X POST \
+  https://7aom0b2xpd.execute-api.us-west-2.amazonaws.com/prod/snippets \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Token: <WEBHOOK_TOKEN>" \
+  -d '{
+    "content": "Coordinate creative with the agency.",
+    "author": "Karan",
+    "mood": "Inspired",
+    "url": "https://example.com/launch-plan",
+    "title": "Q4 launch prep",
+    "tag": "marketing",
+    "tags": ["marketing", "launch", "agency"],
+    "metadata": {
+      "campaign": "Q4-2025",
+      "priority": "high"
+    }
+  }'
+```
+
 ### Chrome Web Store Publishing
 
 #### First-time upload
