@@ -5,16 +5,42 @@ Chrome extension that lets you highlight text on any page and send it to your we
 ### Setup
 
 1. Open `chrome://extensions`, enable **Developer mode**, and use **Load unpacked** to select this `WebhookExtension` folder.
-2. Click **Details → Extension options** (or use the popup’s *Open Options* button) and supply both your Webhook URL and Token. These values are stored in `chrome.storage.sync`.
+2. Click **Details → Extension options** (or use the popup’s *Open Options* button) and supply your Snippet webhook URL/token (required) plus the Page webhook URL/token if you plan to save whole pages. These values are stored in `chrome.storage.sync`.
 
 ### Usage
 
 1. Open the extension popup and toggle **Selection capture** to ON. The action badge shows `ON` while active.
 2. Reload any tab you already had open (Chrome only injects the content script when the page loads).
-3. Highlight text on a regular web page (Chrome system pages such as `chrome://` or the Web Store block extensions). A polished, light/dark-aware Knowledge Dump window slides in with **Tag** and **Title** inputs plus Send/Cancel buttons.
-4. After you press **Send**, the background service worker POSTs a JSON payload (with `tagName`, `title`, `content`, page metadata, and timestamp) to the configured webhook URL, using your token in the `X-Webhook-Token` header.
+3. Highlight text on a regular web page (Chrome system pages such as `chrome://` or the Web Store block extensions). A polished, light/dark-aware Knowledge Dump window slides in with a **Snippet/Page** toggle. Snippet mode shows the captured **Content** plus required **Tag**/**Title** fields and optional URL/Tags. Page mode focuses purely on saving the current URL (fields shown in the order **URL → Title → Tag**); no content/notes are collected.
+4. After you press **Send**, the background service worker POSTs a JSON payload to the appropriate endpoint: Snippet mode uses the snippet webhook, Page mode uses the page webhook. Your selected token is sent via the `X-Webhook-Token` header.
 
-If the webhook, token, or selection is missing, the overlay explains what needs to be fixed. Toggle the popup switch OFF anytime to temporarily disable the selection listener.
+If a webhook, token, or required fields for the chosen mode are missing, the overlay explains what needs to be fixed. Toggle the popup switch OFF anytime to temporarily disable the selection listener.
+
+### Payload formats
+
+#### Snippet mode
+
+```json
+{
+  "content": "Coordinate creative with the agency.",
+  "title": "Q4 launch prep",
+  "tag": "marketing",
+  "url": "https://example.com/launch-plan",
+  "tags": ["marketing", "launch", "agency"]
+}
+```
+
+#### Page mode
+
+```json
+{
+  "url": "https://example.com/full-article",
+  "title": "AI trends to watch",
+  "tag": "research"
+}
+```
+
+Configure the page webhook/token in the Options page to enable this mode.
 
 ### Chrome Web Store Publishing
 

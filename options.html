@@ -14,6 +14,16 @@
       font-size: 1.4rem;
       margin-bottom: 0.5rem;
     }
+    fieldset {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 1.25rem;
+    }
+    legend {
+      font-weight: 600;
+      padding: 0 6px;
+    }
     label {
       display: block;
       margin-top: 1rem;
@@ -56,17 +66,33 @@
 <body>
   <h1>Knowledge Dump Configuration</h1>
   <form id="options-form">
-    <label for="webhook-url">
-      Webhook URL
-      <input type="url" id="webhook-url" name="webhookUrl" placeholder="https://example.com/webhook" required>
-      <small>Must accept JSON POST requests.</small>
-    </label>
+    <fieldset>
+      <legend>Snippet endpoint</legend>
+      <label for="snippet-webhook-url">
+        Webhook URL
+        <input type="url" id="snippet-webhook-url" placeholder="https://example.com/snippets" required>
+        <small>Used when sending highlighted snippets.</small>
+      </label>
+      <label for="snippet-token">
+        Token
+        <input type="text" id="snippet-token" placeholder="Paste secure token" autocomplete="off" required>
+        <small>Sent as <code>X-Webhook-Token</code> for snippets.</small>
+      </label>
+    </fieldset>
 
-    <label for="token">
-      Token
-      <input type="text" id="token" name="token" placeholder="Paste secure token" autocomplete="off" required>
-      <small>Stored securely via chrome.storage.sync.</small>
-    </label>
+    <fieldset>
+      <legend>Page endpoint (optional)</legend>
+      <label for="page-webhook-url">
+        Webhook URL
+        <input type="url" id="page-webhook-url" placeholder="https://example.com/pages">
+        <small>Required only if you plan to save full pages.</small>
+      </label>
+      <label for="page-token">
+        Token
+        <input type="text" id="page-token" placeholder="Paste secure token" autocomplete="off">
+        <small>Needed when a page URL/token pair is provided.</small>
+      </label>
+    </fieldset>
 
     <button type="submit" id="save-btn">Save</button>
     <div id="status" role="status" aria-live="polite"></div>
