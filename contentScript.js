@@ -55,8 +55,8 @@
     }
     const selectionText = (window.getSelection()?.toString() || '').trim();
     if (!selectionText) {
-      if (overlayHasFocus()) {
-        console.debug('[Knowledge Dump] Selection cleared because overlay took focus; keeping window open.');
+      if (overlayIsVisible()) {
+        console.debug('[Knowledge Dump] Selection cleared but overlay is open; waiting for explicit dismiss.');
         return;
       }
       currentSelection = '';
@@ -100,24 +100,6 @@
 
   function overlayIsVisible() {
     return Boolean(overlayHost && overlayHost.style.display !== 'none');
-  }
-
-  function overlayHasFocus() {
-    if (!overlayIsVisible()) {
-      return false;
-    }
-    const activeElement = document.activeElement;
-    if (!activeElement) {
-      return false;
-    }
-    if (activeElement === overlayHost) {
-      return true;
-    }
-    if (overlayHost.contains(activeElement)) {
-      return true;
-    }
-    const shadowActive = overlayHost.shadowRoot?.activeElement;
-    return Boolean(shadowActive);
   }
 
   function handleSelectEvent(event) {
@@ -289,6 +271,15 @@
           border-color: transparent;
           background: rgba(15, 23, 42, 0.85);
         }
+        .field input[readonly] {
+          cursor: default;
+          color: rgba(248, 250, 252, 0.8);
+        }
+        .field input[readonly]:focus {
+          outline: none;
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          background: rgba(15, 23, 42, 0.45);
+        }
         .field label {
           position: absolute;
           left: 16px;
@@ -309,11 +300,6 @@
           top: 6px;
           font-size: 0.63rem;
           color: #38bdf8;
-        }
-        .hint-row {
-          font-size: 0.78rem;
-          color: rgba(248, 250, 252, 0.7);
-          margin-top: -6px;
         }
         .actions {
           display: flex;
@@ -356,18 +342,6 @@
         .feedback.success {
           color: #34d399;
         }
-        .section-divider {
-          margin: 4px 0 0;
-          font-size: 0.72rem;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          color: rgba(148, 163, 184, 0.8);
-        }
-        .optional-note {
-          margin-top: -4px;
-          font-size: 0.75rem;
-          color: rgba(248, 250, 252, 0.65);
-        }
       </style>
       <div class="card" role="dialog" aria-modal="false" aria-live="polite">
         <div class="card-header">
@@ -383,9 +357,6 @@
             <textarea id="content-input" placeholder=" "></textarea>
             <label for="content-input">Content *</label>
           </div>
-          <div class="hint-row" id="content-hint">
-            Review or edit the captured snippet before sending.
-          </div>
           <div class="field" id="tag-field">
             <input type="text" id="tag-input" autocomplete="off" placeholder=" ">
             <label for="tag-input">Tag *</label>
@@ -394,15 +365,9 @@
             <input type="text" id="title-input" autocomplete="off" placeholder=" ">
             <label for="title-input">Title *</label>
           </div>
-          <div class="section-divider" id="optional-divider">Optional fields</div>
-          <div class="optional-note" id="optional-note">Add context like source URL or topic tags.</div>
           <div class="field" id="url-field">
-            <input type="url" id="url-input" autocomplete="off" placeholder=" ">
+            <input type="url" id="url-input" autocomplete="off" placeholder=" " readonly>
             <label for="url-input">URL</label>
-          </div>
-          <div class="field" id="tags-field">
-            <input type="text" id="tags-input" autocomplete="off" placeholder=" ">
-            <label for="tags-input">Tags (comma separated)</label>
           </div>
           <div class="feedback" id="feedback"></div>
           <div class="actions">
@@ -424,12 +389,7 @@
         urlInput: shadow.getElementById('url-input'),
         urlField: shadow.getElementById('url-field'),
         urlLabel: shadow.querySelector('label[for="url-input"]'),
-        tagsInput: shadow.getElementById('tags-input'),
-        tagsField: shadow.getElementById('tags-field'),
         contentLabel: shadow.querySelector('label[for="content-input"]'),
-        contentHint: shadow.getElementById('content-hint'),
-        sectionDivider: shadow.getElementById('optional-divider'),
-        optionalNote: shadow.getElementById('optional-note'),
         modeButtons: Array.from(shadow.querySelectorAll('.mode-btn')),
         feedback: shadow.getElementById('feedback'),
         sendButton: shadow.getElementById('send-btn'),
@@ -486,7 +446,6 @@
     overlayElements.tagInput.value = '';
     overlayElements.titleInput.value = document.title || '';
     overlayElements.urlInput.value = window.location.href || '';
-    overlayElements.tagsInput.value = '';
     overlayElements.sendButton.disabled = false;
     overlayElements.sendButton.textContent = 'Send';
     isSending = false;
@@ -549,16 +508,6 @@
     if (overlayElements.contentField) {
       overlayElements.contentField.classList.toggle('hidden', isPageMode);
     }
-    if (overlayElements.contentHint) {
-      overlayElements.contentHint.classList.toggle('hidden', isPageMode);
-      overlayElements.contentHint.textContent =
-        mode === 'snippet'
-          ? 'Review or edit the captured snippet before sending.'
-          : 'Optional notes about this page.';
-    }
-    overlayElements.sectionDivider?.classList.toggle('hidden', isPageMode);
-    overlayElements.optionalNote?.classList.toggle('hidden', isPageMode);
-    overlayElements.tagsField?.classList.toggle('hidden', isPageMode);
     if (overlayElements.urlLabel) {
       overlayElements.urlLabel.textContent = isPageMode ? 'URL *' : 'URL';
     }
@@ -569,23 +518,15 @@
     const orders = {
       snippet: {
         contentField: 1,
-        contentHint: 2,
-        tagField: 3,
-        titleField: 4,
-        sectionDivider: 5,
-        optionalNote: 6,
-        urlField: 7,
-        tagsField: 8
+        tagField: 2,
+        titleField: 3,
+        urlField: 4
       },
       page: {
         urlField: 1,
         titleField: 2,
         tagField: 3,
-        contentField: 4,
-        contentHint: 5,
-        sectionDivider: 6,
-        optionalNote: 7,
-        tagsField: 8
+        contentField: 4
       }
     };
 
@@ -608,7 +549,6 @@
     const tag = overlayElements.tagInput.value.trim();
     const title = overlayElements.titleInput.value.trim();
     const urlValue = overlayElements.urlInput.value.trim();
-    const tagsRaw = overlayElements.tagsInput.value.trim();
     const isSnippetMode = currentMode === 'snippet';
 
     if (isSnippetMode && !contentValue) {
@@ -626,12 +566,6 @@
       return;
     }
 
-    const tags = tagsRaw
-      ? tagsRaw
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : [];
     const urlToSend = urlValue || window.location.href || '';
     if (!isSnippetMode && !urlToSend) {
       setFeedback('URL is required when saving pages.', true);
@@ -696,10 +630,6 @@
         url: urlToSend
       };
     }
-    if (tags.length) {
-      payload.tags = tags;
-    }
-
     try {
       const response = await sendMessage({
         type: 'SEND_WEBHOOK',

@@ -11,7 +11,7 @@ Chrome extension that lets you highlight text on any page and send it to your we
 
 1. Open the extension popup and toggle **Selection capture** to ON. The action badge shows `ON` while active.
 2. Reload any tab you already had open (Chrome only injects the content script when the page loads).
-3. Highlight text on a regular web page (Chrome system pages such as `chrome://` or the Web Store block extensions). A polished, light/dark-aware Knowledge Dump window slides in with a **Snippet/Page** toggle. Snippet mode shows the captured **Content** plus required **Tag**/**Title** fields and optional URL/Tags. Page mode focuses purely on saving the current URL (fields shown in the order **URL → Title → Tag**); no content/notes are collected.
+3. Highlight text on a regular web page (Chrome system pages such as `chrome://` or the Web Store block extensions). A polished, light/dark-aware Knowledge Dump window slides in with a **Snippet/Page** toggle. Snippet mode shows the captured **Content** plus required **Tag**/**Title** fields (URL is optional and auto-filled). Page mode focuses purely on saving the current URL (fields shown in the order **URL → Title → Tag**); the URL input is auto-filled and required, and no content/notes are collected.
 4. After you press **Send**, the background service worker POSTs a JSON payload to the appropriate endpoint: Snippet mode uses the snippet webhook, Page mode uses the page webhook. Your selected token is sent via the `X-Webhook-Token` header.
 
 If a webhook, token, or required fields for the chosen mode are missing, the overlay explains what needs to be fixed. Toggle the popup switch OFF anytime to temporarily disable the selection listener.
@@ -25,10 +25,11 @@ If a webhook, token, or required fields for the chosen mode are missing, the ove
   "content": "Coordinate creative with the agency.",
   "title": "Q4 launch prep",
   "tag": "marketing",
-  "url": "https://example.com/launch-plan",
-  "tags": ["marketing", "launch", "agency"]
+  "url": "https://example.com/launch-plan"
 }
 ```
+
+Need custom fields such as tags or metadata? The backend accepts them when you call the API directly—see the cURL examples below.
 
 #### Page mode
 
