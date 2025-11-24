@@ -5,6 +5,8 @@
     snippetToken: '',
     pageWebhookUrl: '',
     pageToken: '',
+    youtubeWebhookUrl: '',
+    youtubeToken: '',
     webhookUrl: '',
     token: ''
   };
@@ -15,6 +17,40 @@
   let overlayElements = null;
   let isSending = false;
   let currentMode = 'snippet';
+  let detachViewportListener = null;
+
+  function extractYouTubeVideoId(value) {
+    if (!value) {
+      return '';
+    }
+    const trimmed = value.trim();
+    // Already looks like an ID? Use it.
+    if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+      return trimmed;
+    }
+    try {
+      const url = new URL(trimmed);
+      const hostname = url.hostname.replace(/^www\\./i, '');
+      if (hostname === 'youtu.be') {
+        const parts = url.pathname.split('/').filter(Boolean);
+        return parts[0] || '';
+      }
+      if (hostname.endsWith('youtube.com')) {
+        const vParam = url.searchParams.get('v');
+        if (vParam) {
+          return vParam;
+        }
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        const candidate = pathParts[pathParts.length - 1];
+        if (candidate && /^[a-zA-Z0-9_-]{6,}$/.test(candidate)) {
+          return candidate;
+        }
+      }
+    } catch (e) {
+      // not a URL; fall through
+    }
+    return '';
+  }
 
   console.debug('[Knowledge Dump] content script loaded.');
 
@@ -25,6 +61,7 @@
   document.addEventListener('selectionchange', handleSelectionChange);
   document.addEventListener('keydown', handleKeydown);
   document.addEventListener('click', handleDocumentClick, true);
+  attachViewportListener();
 
   async function loadActivationState() {
     try {
@@ -165,13 +202,15 @@
       overlayHost.style.width = 'max-content';
       overlayHost.style.maxWidth = '100%';
       overlayHost.style.boxSizing = 'border-box';
+      overlayHost.style.transformOrigin = 'top left';
       overlayHost.setAttribute('aria-hidden', 'true');
 
-        const shadow = overlayHost.attachShadow({ mode: 'open' });
+      const shadow = overlayHost.attachShadow({ mode: 'open' });
       shadow.innerHTML = `
       <style>
         :host {
           all: initial;
+          font-size: 12px;
         }
         :host, * {
           box-sizing: border-box;
@@ -342,16 +381,21 @@
         </div>
         <form id="overlay-form">
           <div class="mode-toggle" role="group" aria-label="Capture mode">
-            <button type="button" class="mode-btn active" data-mode="snippet">Snippet</button>
-            <button type="button" class="mode-btn" data-mode="page">Page</button>
-          </div>
-          <div class="field" id="content-field">
-            <textarea id="content-input" placeholder=" "></textarea>
-            <label for="content-input">Content *</label>
+          <button type="button" class="mode-btn active" data-mode="snippet">Snippet</button>
+          <button type="button" class="mode-btn" data-mode="page">Page</button>
+          <button type="button" class="mode-btn" data-mode="youtube">YouTube</button>
+        </div>
+        <div class="field" id="content-field">
+          <textarea id="content-input" placeholder=" "></textarea>
+          <label for="content-input">Content *</label>
+        </div>
+          <div class="field" id="video-field">
+            <input type="text" id="video-input" autocomplete="off" placeholder=" ">
+            <label for="video-input">YouTube URL or ID *</label>
           </div>
           <div class="field" id="tag-field">
-            <input type="text" id="tag-input" autocomplete="off" placeholder=" ">
-            <label for="tag-input">Tag *</label>
+            <input type="text" id="primary-tag-input" autocomplete="off" placeholder=" ">
+            <label for="primary-tag-input">Primary tag</label>
           </div>
           <div class="field" id="title-field">
             <input type="text" id="title-input" autocomplete="off" placeholder=" ">
@@ -374,7 +418,9 @@
         form: shadow.getElementById('overlay-form'),
         contentInput: shadow.getElementById('content-input'),
         contentField: shadow.getElementById('content-field'),
-        tagInput: shadow.getElementById('tag-input'),
+        videoInput: shadow.getElementById('video-input'),
+        videoField: shadow.getElementById('video-field'),
+        tagInput: shadow.getElementById('primary-tag-input'),
         tagField: shadow.getElementById('tag-field'),
         titleInput: shadow.getElementById('title-input'),
         titleField: shadow.getElementById('title-field'),
@@ -399,7 +445,7 @@
       });
       overlayElements.modeButtons.forEach((button) => {
         button.addEventListener('click', () => {
-          const targetMode = button.dataset.mode === 'page' ? 'page' : 'snippet';
+          const targetMode = button.dataset.mode === 'page' ? 'page' : button.dataset.mode === 'youtube' ? 'youtube' : 'snippet';
           if (targetMode !== currentMode) {
             setMode(targetMode);
           }
@@ -427,6 +473,7 @@
     if (!overlayHost || !overlayElements) {
       return;
     }
+    applyOverlayScale();
 
     overlayHost.style.display = 'block';
     overlayHost.setAttribute('aria-hidden', 'false');
@@ -438,6 +485,8 @@
     overlayElements.titleInput.value = document.title || '';
     overlayElements.authorInput.value = '';
     currentPageUrl = window.location.href || '';
+    const defaultVideoId = extractYouTubeVideoId(currentPageUrl);
+    overlayElements.videoInput.value = defaultVideoId || '';
     overlayElements.sendButton.disabled = false;
     overlayElements.sendButton.textContent = 'Send';
     isSending = false;
@@ -482,7 +531,7 @@
   }
 
   function setMode(mode) {
-    if (mode !== 'snippet' && mode !== 'page') {
+    if (mode !== 'snippet' && mode !== 'page' && mode !== 'youtube') {
       return;
     }
     currentMode = mode;
@@ -490,31 +539,66 @@
       return;
     }
     const isPageMode = mode === 'page';
+    const isSnippetMode = mode === 'snippet';
+    const isYoutubeMode = mode === 'youtube';
     overlayElements.modeButtons?.forEach((button) => {
       const isActive = button.dataset.mode === mode;
       button.classList.toggle('active', isActive);
       button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
     if (overlayElements.contentLabel) {
-      overlayElements.contentLabel.textContent = mode === 'snippet' ? 'Content *' : 'Notes (optional)';
+      overlayElements.contentLabel.textContent = isSnippetMode ? 'Content *' : 'Notes (optional)';
+    }
+    if (overlayElements.tagField?.querySelector('label')) {
+      overlayElements.tagField.querySelector('label').textContent = 'Primary tag ';
+    }
+    if (overlayElements.titleField?.querySelector('label')) {
+      overlayElements.titleField.querySelector('label').textContent = isYoutubeMode ? 'Title (optional)' : 'Title *';
+    }
+    if (overlayElements.videoField?.querySelector('label')) {
+      overlayElements.videoField.querySelector('label').textContent = 'YouTube URL or ID *';
     }
     if (overlayElements.contentField) {
-      overlayElements.contentField.classList.toggle('hidden', isPageMode);
+      overlayElements.contentField.classList.toggle('hidden', isPageMode || isYoutubeMode);
+    }
+    if (overlayElements.videoField) {
+      overlayElements.videoField.classList.toggle('hidden', !isYoutubeMode);
+    }
+    if (overlayElements.titleField) {
+      overlayElements.titleField.classList.toggle('hidden', isYoutubeMode);
+    }
+    if (overlayElements.tagField) {
+      overlayElements.tagField.classList.toggle('hidden', isYoutubeMode);
+    }
+    if (overlayElements.authorField) {
+      overlayElements.authorField.classList.toggle('hidden', isYoutubeMode);
     }
     const snippetOrder = {
       contentField: 1,
-      tagField: 2,
-      titleField: 3,
-      authorField: 4
+      titleField: 2,
+      tagField: 3,
+      authorField: 4,
+      videoField: 5
     };
     const pageOrder = {
       titleField: 1,
       tagField: 2,
       authorField: 3,
-      contentField: 4
+      contentField: 4,
+      videoField: 5
+    };
+    const youtubeOrder = {
+      videoField: 1,
+      titleField: 2,
+      tagField: 3,
+      authorField: 4,
+      contentField: 5
     };
 
-    const orderMap = mode === 'snippet' ? snippetOrder : pageOrder;
+    const orderMap = isSnippetMode ? snippetOrder : isPageMode ? pageOrder : youtubeOrder;
+    overlayElements.contentInput.required = isSnippetMode;
+    overlayElements.titleInput.required = isSnippetMode || isPageMode;
+    overlayElements.videoInput.required = isYoutubeMode;
     Object.entries(orderMap).forEach(([key, order]) => {
       const element = overlayElements[key];
       if (element) {
@@ -530,29 +614,37 @@
     }
 
     const contentValue = overlayElements.contentInput.value.trim();
-    const tag = overlayElements.tagInput.value.trim();
+    const primaryTag = overlayElements.tagInput.value.trim();
     const title = overlayElements.titleInput.value.trim();
     const author = overlayElements.authorInput.value.trim();
+    const videoValue = overlayElements.videoInput.value.trim();
     const isSnippetMode = currentMode === 'snippet';
+    const isPageMode = currentMode === 'page';
+    const isYoutubeMode = currentMode === 'youtube';
 
     if (isSnippetMode && !contentValue) {
-      setFeedback('Content is required. Paste or type your snippet.', true);
-      return;
-    }
-
-    if (!tag) {
-      setFeedback('Tag is required.', true);
-      return;
-    }
-
-    if (!title) {
-      setFeedback('Title is required.', true);
+      setFeedback('Content is required for snippets.', true);
       return;
     }
 
     const urlToSend = currentPageUrl || window.location.href || '';
-    if (!isSnippetMode && !urlToSend) {
+    if (isPageMode && !urlToSend) {
       setFeedback('URL is required when saving pages.', true);
+      return;
+    }
+
+    if ((isSnippetMode || isPageMode) && !title) {
+      setFeedback('Title is required.', true);
+      return;
+    }
+
+    if (isYoutubeMode && !videoValue) {
+      setFeedback('YouTube URL or ID is required.', true);
+      return;
+    }
+    const videoId = isYoutubeMode ? extractYouTubeVideoId(videoValue) : '';
+    if (isYoutubeMode && !videoId) {
+      setFeedback('Provide a valid YouTube URL or video ID.', true);
       return;
     }
 
@@ -569,19 +661,30 @@
     const snippetToken = config.snippetToken || config.token || '';
     const pageWebhookUrl = config.pageWebhookUrl || '';
     const pageToken = config.pageToken || '';
+    const youtubeWebhookUrl = config.youtubeWebhookUrl || '';
+    const youtubeToken = config.youtubeToken || '';
 
     let targetWebhookUrl = '';
     let targetToken = '';
-    if (isSnippetMode) {
+    if (isSnippetMode || isYoutubeMode) {
       targetWebhookUrl = snippetWebhookUrl;
       targetToken = snippetToken;
-      if (!targetWebhookUrl) {
-        setFeedback('Snippet webhook URL missing. Use the Options page to set it.', true);
-        return;
-      }
-      if (!targetToken) {
-        setFeedback('Snippet token missing. Use the Options page to set it.', true);
-        return;
+      if (isSnippetMode) {
+        if (!targetWebhookUrl) {
+          setFeedback('Snippet webhook URL missing. Use the Options page to set it.', true);
+          return;
+        }
+        if (!targetToken) {
+          setFeedback('Snippet token missing. Use the Options page to set it.', true);
+          return;
+        }
+      } else {
+        targetWebhookUrl = youtubeWebhookUrl || snippetWebhookUrl;
+        targetToken = youtubeToken || snippetToken || '';
+        if (!targetWebhookUrl) {
+          setFeedback('YouTube webhook URL missing. Use the Options page to set it.', true);
+          return;
+        }
       }
     } else {
       targetWebhookUrl = pageWebhookUrl;
@@ -600,26 +703,32 @@
     let payload;
     if (isSnippetMode) {
       payload = {
+        source: 'snippet',
         content: contentValue,
         title,
-        tag
       };
       if (urlToSend) {
         payload.url = urlToSend;
       }
-      if (author) {
-        payload.author = author;
-      }
-    } else {
+    } else if (isPageMode) {
       payload = {
+        source: 'webpage',
         title,
-        tag,
         url: urlToSend
       };
-      if (author) {
-        payload.author = author;
+    } else {
+      payload = { source: 'youtube', videoId };
+      if (title) {
+        payload.title = title;
       }
     }
+    if (primaryTag) {
+      payload.primaryTag = primaryTag;
+    }
+    if (author) {
+      payload.author = author;
+    }
+
     try {
       const response = await sendMessage({
         type: 'SEND_WEBHOOK',
@@ -681,5 +790,30 @@
         resolve(response);
       });
     });
+  }
+
+  function applyOverlayScale() {
+    if (!overlayHost) {
+      return;
+    }
+    const zoom = window.visualViewport?.scale || 1;
+    const scale = zoom ? 1 / zoom : 1;
+    overlayHost.style.transform = `scale(${scale})`;
+  }
+
+  function attachViewportListener() {
+    if (!window.visualViewport) {
+      return;
+    }
+    const listener = () => {
+      applyOverlayScale();
+      if (overlayIsVisible()) {
+        requestAnimationFrame(() => positionOverlay(null));
+      }
+    };
+    window.visualViewport.addEventListener('resize', listener);
+    detachViewportListener = () => {
+      window.visualViewport.removeEventListener('resize', listener);
+    };
   }
 })();

@@ -1,8 +1,16 @@
 const badgeColor = '#1d7bf2';
 
 function updateBadge(isActive) {
-  chrome.action.setBadgeBackgroundColor({ color: badgeColor });
-  chrome.action.setBadgeText({ text: isActive ? 'ON' : '' });
+  try {
+    if (!chrome.action) {
+      return;
+    }
+    chrome.action.setBadgeBackgroundColor({ color: badgeColor });
+    chrome.action.setBadgeText({ text: isActive ? 'ON' : '' });
+  } catch (error) {
+    const message = error?.message || error;
+    console.error('Failed to update badge', message);
+  }
 }
 
 chrome.runtime.onInstalled.addListener(({ reason }) => {
@@ -21,14 +29,14 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 
-function bootstrapBadge() {
-  chrome.storage.sync.get({ isActive: false }, (result) => {
-    if (chrome.runtime.lastError) {
-      console.error('Failed to initialize badge', chrome.runtime.lastError);
-      return;
-    }
-    updateBadge(Boolean(result.isActive));
-  });
+async function bootstrapBadge() {
+  try {
+    const { isActive = false } = await chrome.storage.sync.get({ isActive: false });
+    updateBadge(Boolean(isActive));
+  } catch (error) {
+    const message = error?.message || error;
+    console.error('Failed to initialize badge', message);
+  }
 }
 
 bootstrapBadge();
@@ -54,10 +62,6 @@ async function sendWebhook(payload) {
     throw new Error('Webhook URL is not configured. Please set it in the Options page.');
   }
 
-  if (!token) {
-    throw new Error('Webhook token is missing. Please save it in the Options page.');
-  }
-
   if (!body) {
     throw new Error('Missing request body.');
   }
@@ -65,8 +69,8 @@ async function sendWebhook(payload) {
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'X-Webhook-Token': token
+      ...(token ? { 'X-Webhook-Token': token } : {}),
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });

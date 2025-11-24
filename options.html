@@ -94,6 +94,20 @@
       </label>
     </fieldset>
 
+    <fieldset>
+      <legend>YouTube endpoint</legend>
+      <label for="youtube-webhook-url">
+        Webhook URL
+        <input type="url" id="youtube-webhook-url" placeholder="https://example.com/youtube-webhook">
+        <small>Used when sending YouTube captures. No token required unless your endpoint expects one.</small>
+      </label>
+      <label for="youtube-token">
+        Token (optional)
+        <input type="text" id="youtube-token" placeholder="Paste token if required" autocomplete="off">
+        <small>Sent as <code>X-Webhook-Token</code> only if provided.</small>
+      </label>
+    </fieldset>
+
     <button type="submit" id="save-btn">Save</button>
     <div id="status" role="status" aria-live="polite"></div>
   </form>

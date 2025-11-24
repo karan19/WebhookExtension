@@ -3,6 +3,8 @@ const defaults = {
   snippetToken: '',
   pageWebhookUrl: '',
   pageToken: '',
+  youtubeWebhookUrl: '',
+  youtubeToken: '',
   webhookUrl: '',
   token: ''
 };
@@ -12,6 +14,8 @@ const snippetWebhookInput = document.getElementById('snippet-webhook-url');
 const snippetTokenInput = document.getElementById('snippet-token');
 const pageWebhookInput = document.getElementById('page-webhook-url');
 const pageTokenInput = document.getElementById('page-token');
+const youtubeWebhookInput = document.getElementById('youtube-webhook-url');
+const youtubeTokenInput = document.getElementById('youtube-token');
 const statusEl = document.getElementById('status');
 const saveBtn = document.getElementById('save-btn');
 
@@ -29,6 +33,8 @@ async function restoreOptions() {
     snippetTokenInput.value = snippetToken;
     pageWebhookInput.value = stored.pageWebhookUrl || '';
     pageTokenInput.value = stored.pageToken || '';
+    youtubeWebhookInput.value = stored.youtubeWebhookUrl || '';
+    youtubeTokenInput.value = stored.youtubeToken || '';
     setStatus('Loaded saved values.');
   } catch (error) {
     console.error('Failed to restore options', error);
@@ -42,6 +48,8 @@ form.addEventListener('submit', async (event) => {
   const snippetToken = snippetTokenInput.value.trim();
   const pageWebhookUrl = pageWebhookInput.value.trim();
   const pageToken = pageTokenInput.value.trim();
+  const youtubeWebhookUrl = youtubeWebhookInput.value.trim();
+  const youtubeToken = youtubeTokenInput.value.trim();
 
   if (!snippetWebhookUrl || !snippetToken) {
     setStatus('Snippet webhook URL and token are required.', true);
@@ -54,6 +62,12 @@ form.addEventListener('submit', async (event) => {
     return;
   }
 
+  const youtubeFieldsProvided = Boolean(youtubeWebhookUrl || youtubeToken);
+  if (youtubeFieldsProvided && !youtubeWebhookUrl) {
+    setStatus('YouTube webhook URL is required when setting a YouTube token.', true);
+    return;
+  }
+
   saveBtn.disabled = true;
   setStatus('Saving...');
 
@@ -63,6 +77,8 @@ form.addEventListener('submit', async (event) => {
       snippetToken,
       pageWebhookUrl,
       pageToken,
+      youtubeWebhookUrl,
+      youtubeToken,
       // legacy keys for backward compatibility
       webhookUrl: snippetWebhookUrl,
       token: snippetToken
